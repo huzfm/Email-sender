@@ -15,21 +15,21 @@ async function authorize(): Promise<OAuth2Client> {
   const raw = fs.readFileSync("credentials.json", "utf8");
   const credentials = JSON.parse(raw);
   const installed = (credentials.installed || credentials.web) as any;
-  const { client_secret, client_id, redirect_uris } = installed;
+  const { client_secret, client_id } = installed;
 
   const oAuth2Client = new google.auth.OAuth2(
     client_id,
     client_secret,
-    redirect_uris[0]
+    "urn:ietf:wg:oauth:2.0:oob"
   );
 
   if (fs.existsSync(TOKEN_PATH)) {
     const token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8"));
     oAuth2Client.setCredentials(token);
-    return oAuth2Client as OAuth2Client;
+    return oAuth2Client;
   }
 
-  return getNewToken(oAuth2Client as unknown as OAuth2Client);
+  return getNewToken(oAuth2Client);
 }
 
 function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
@@ -37,9 +37,10 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: "offline",
       scope: SCOPES,
+      prompt: "consent",
     });
 
-    console.log("Authorize this app by visiting this URL:");
+    console.log("Authentication required");
     console.log(authUrl);
 
     const rl = readline.createInterface({
@@ -47,17 +48,18 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
       output: process.stdout,
     });
 
-    rl.question("Enter the code here: ", async (code) => {
+    rl.question("Enter the code: ", async (code) => {
       rl.close();
       try {
-        const r = await oAuth2Client.getToken(code);
-        const token = r.tokens || (r as any).tokens || r;
-        fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
-        console.log("Token saved ✔");
-        oAuth2Client.setCredentials(token);
+        const { tokens } = await oAuth2Client.getToken(code.trim());
+
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+        console.log("Token saved!");
+
+        oAuth2Client.setCredentials(tokens);
         resolve(oAuth2Client);
       } catch (err) {
-        console.error("Error retrieving token", err);
+        console.error("Error retrieving token:", err);
         reject(err);
       }
     });
@@ -145,28 +147,24 @@ async function markAsSent(auth: OAuth2Client, rowIndex: number) {
 
 async function main(): Promise<void> {
   if (!SPREADSHEET_ID) {
-    console.error("SPREADSHEET_ID is not set.");
+    console.error("SPREADSHEET_ID not found.");
     process.exit(1);
   }
 
   try {
     const auth = await authorize();
-
     const recipients = await getSheetData(auth);
     const template = await getEmailTemplate(auth);
 
     for (let i = 0; i < recipients.length; i++) {
       const row = recipients[i];
-
       if (!row) continue;
-
       if (row[5] === "Sent") continue;
 
       const email = row[1];
       if (!email) continue;
 
       const personalized = personalize(template, row);
-
       const subject = extractSubject(template);
       const htmlBody = stripSubject(personalized);
 
@@ -175,11 +173,11 @@ async function main(): Promise<void> {
       await sendEmail(auth, email, subject, htmlBody);
       await markAsSent(auth, i);
 
-      console.log(`✔ SENT to ${email}`);
-      await new Promise((r) => setTimeout(r, 1500)); // avoid rate limits
+      console.log(`SENT: ${email}`);
+      await new Promise((r) => setTimeout(r, 1500)); // avoid Gmail throttling
     }
   } catch (err) {
-    console.error("Fatal error:", err);
+    console.error("Error", err);
     process.exit(1);
   }
 }
