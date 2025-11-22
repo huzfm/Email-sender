@@ -11,6 +11,9 @@ const SCOPES = [
 const TOKEN_PATH = "token.json";
 const SPREADSHEET_ID = process.env.SpreadSheetID;
 
+// ---------------------------------------------
+//  AUTH
+// ---------------------------------------------
 async function authorize(): Promise<OAuth2Client> {
   const raw = fs.readFileSync("credentials.json", "utf8");
   const credentials = JSON.parse(raw);
@@ -40,7 +43,7 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
       prompt: "consent",
     });
 
-    console.log("Authentication required");
+    console.log("Authentication required:");
     console.log(authUrl);
 
     const rl = readline.createInterface({
@@ -52,10 +55,8 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
       rl.close();
       try {
         const { tokens } = await oAuth2Client.getToken(code.trim());
-
         fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
         console.log("Token saved!");
-
         oAuth2Client.setCredentials(tokens);
         resolve(oAuth2Client);
       } catch (err) {
@@ -66,13 +67,15 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
   });
 }
 
+// ---------------------------------------------
+//  SHEETS FUNCTIONS
+// ---------------------------------------------
 async function getSheetData(auth: OAuth2Client): Promise<string[][]> {
   const sheets = google.sheets({ version: "v4", auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: "Recipients!A2:F",
   });
-
   return (res.data.values as string[][]) || [];
 }
 
@@ -84,27 +87,43 @@ async function getEmailTemplate(auth: OAuth2Client): Promise<string> {
   });
 
   const values = res.data.values as string[][] | undefined;
-  if (!values || !values[0] || !values[0][0]) return "";
-  return values[0][0];
+  return values?.[0]?.[0] || "";
 }
 
+// ⭐ NEW — Get common subject from sheet
+async function getCommonSubject(auth: OAuth2Client): Promise<string> {
+  const sheets = google.sheets({ version: "v4", auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "EmailTemplate!A2",
+  });
+
+  const values = res.data.values as string[][] | undefined;
+  if (!values || !values[0] || !values[0][0]) {
+    return "New Opportunity with Devark"; // fallback subject
+  }
+
+  return values[0][0].replace("CommonSubject:", "").trim();
+}
+
+// ---------------------------------------------
+//  TEMPLATE PROCESSING
+// ---------------------------------------------
 function personalize(template: string, data: string[]): string {
   return template
-    .replace(/{{name}}/g, data[0] || "")
-    .replace(/{{company}}/g, data[2] || "")
-    .replace(/{{role}}/g, data[3] || "")
-    .replace(/{{custom_note}}/g, data[4] || "");
-}
-
-function extractSubject(template: string): string {
-  const subjectLine = template.split("\n")[0] || "";
-  return subjectLine.replace("Subject:", "").trim();
+    .replace(/{{\s*name\s*}}/gi, data[0] || "")
+    .replace(/{{\s*company\s*}}/gi, data[2] || "")
+    .replace(/{{\s*role\s*}}/gi, data[3] || "")
+    .replace(/{{\s*custom[_\s]*note\s*}}/gi, data[4] || "");
 }
 
 function stripSubject(template: string): string {
   return template.split("\n").slice(1).join("\n");
 }
 
+// ---------------------------------------------
+//  SEND EMAIL
+// ---------------------------------------------
 async function sendEmail(
   auth: OAuth2Client,
   to: string,
@@ -145,6 +164,9 @@ async function markAsSent(auth: OAuth2Client, rowIndex: number) {
   });
 }
 
+// ---------------------------------------------
+//  MAIN
+// ---------------------------------------------
 async function main(): Promise<void> {
   if (!SPREADSHEET_ID) {
     console.error("SPREADSHEET_ID not found.");
@@ -153,8 +175,10 @@ async function main(): Promise<void> {
 
   try {
     const auth = await authorize();
+
     const recipients = await getSheetData(auth);
     const template = await getEmailTemplate(auth);
+    const subject = await getCommonSubject(auth); // ⭐ NEW
 
     for (let i = 0; i < recipients.length; i++) {
       const row = recipients[i];
@@ -165,7 +189,6 @@ async function main(): Promise<void> {
       if (!email) continue;
 
       const personalized = personalize(template, row);
-      const subject = extractSubject(template);
       const htmlBody = stripSubject(personalized);
 
       console.log("Sending to:", email);
@@ -173,8 +196,8 @@ async function main(): Promise<void> {
       await sendEmail(auth, email, subject, htmlBody);
       await markAsSent(auth, i);
 
-      console.log(`SENT: ${email}`);
-      await new Promise((r) => setTimeout(r, 1500)); // avoid Gmail throttling
+      console.log(`✔ SENT: ${email}`);
+      await new Promise((r) => setTimeout(r, 1500)); // Gmail safe delay
     }
   } catch (err) {
     console.error("Error", err);
