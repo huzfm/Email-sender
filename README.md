@@ -1,22 +1,21 @@
-# Devark Mass Emailer – Full Setup Guide
+# Mass Customized Emailer 
 
-A complete step-by-step guide to set up your personalized Gmail + Sheets mass email system using Google APIs. This document explains everything from creating your sheet → building templates → generating OAuth credentials → running your program.
-
+A complete step-by-step guide to set up your personalized Gmail + Sheets mass email system using Google APIs.
 ---
 
-## 📝 1. Create Your Google Sheet
+## 1. Create Your Google Sheet
 
-Create a new Google Sheet and name it **Devark Mass Emailer**.
+Create a new Google Sheet
 
 Your sheet must contain **two tabs**:
 
-### ✔ Tab 1 — `Recipients`
+### Tab 1 — `Recipients`
 
-### ✔ Tab 2 — `EmailTemplate`
+### Tab 2 — `EmailTemplate`
 
 ---
 
-## 📄 2. Setup Tab 1: Recipients
+## 2. Setup Tab 1: Recipients
 
 Create a sheet named **Recipients**.
 
@@ -38,9 +37,12 @@ Add these exact columns:
 | John Doe | johndoe@gmail.com   | Acme Inc   | CEO     | Big fan of your work    |        |
 | Sara Ali | sara@startuphub.com | StartupHub | Founder | Loved your last webinar |        |
 
-> ⚠️ Do NOT manually add “Sent”. The script updates this.
-
 ---
+Sample sheet link:
+
+```
+https://docs.google.com/spreadsheets/d/12vGmeJUBjATmF3jRkPzG4-vkfcweTIW6X7iQucdLfrA/edit
+```
 
 ## ✉️ 3. Setup Tab 2: EmailTemplate
 
@@ -70,25 +72,7 @@ Best regards,
 Huzaif
 ```
 
-### **A2 → Common Subject**
-
-```
-CommonSubject: Opportunity for Collaboration with Devark
-```
-
----
-
-## 🔧 4. Install Dependencies
-
-Run:
-
-```bash
-npm install googleapis google-auth-library
-```
-
----
-
-## 🔑 5. Generate OAuth Credentials
+## 3. Generate OAuth Credentials
 
 1. Go to **Google Cloud Console**  
    https://console.cloud.google.com
@@ -108,13 +92,7 @@ npm install googleapis google-auth-library
   └── token.json  (auto-created)
 ```
 
-### Why Desktop App?
-
-Because it avoids Test User restrictions — you can instantly use it.
-
----
-
-## ⚙️ 6. Add Environment Variable
+## ⚙️ 4. Add Environment Variable
 
 Create `.env`:
 
@@ -136,12 +114,12 @@ The ID is:
 
 ---
 
-## 🔐 7. Run Authentication
+## 5. Run Script
 
 Run:
 
 ```bash
-node dist/index.js
+bu index.ts
 ```
 
 You’ll see:
@@ -159,109 +137,8 @@ Steps:
 3. Copy the verification code
 4. Paste into terminal
 5. Your `token.json` is saved
-6. Authentication complete 🎉
+6. Authentication complete 
 
 Next runs will NOT require login again.
 
 ---
-
-## 🧠 8. Placeholder System
-
-Your template can use:
-
-| Placeholder       | Description       |
-| ----------------- | ----------------- |
-| `{{name}}`        | Recipient name    |
-| `{{company}}`     | Company           |
-| `{{role}}`        | Job role          |
-| `{{custom_note}}` | Personalized note |
-
-The system automatically supports:
-
-```
-{{ name }}
-{{Name}}
-{{ custom note }}
-{{custom_note}}
-```
-
----
-
-## 🚀 9. Running the Email Script
-
-To send emails:
-
-```bash
-node dist/index.js
-```
-
-What happens:
-
-- Reads your recipients list
-- Loads your HTML email template
-- Loads your common subject
-- Personalizes each email
-- Sends using Gmail API
-- Marks each row as “Sent”
-- Moves to next automatically
-- Skips automatically if already “Sent”
-
----
-
-## 📧 10. Gmail API Send Limits
-
-For a **personal Gmail account**:
-
-| Action Type       | Limit        |
-| ----------------- | ------------ |
-| Gmail API sending | ~100–150/day |
-| Gmail normal UI   | ~500/day     |
-
-Your script already uses a delay:
-
-```ts
-await new Promise((r) => setTimeout(r, 1500));
-```
-
-This avoids throttling.
-
----
-
-## 🛡️ 11. Security Notes
-
-- OAuth credentials stay local
-- token.json stays local
-- Emails send from YOUR Gmail only
-- No server-side dependency
-- No exposing Gmail password
-- OOB mode avoids localhost issues
-
----
-
-## 🎉 You're Done!
-
-You now have:
-
-✔ Gmail API mass emailing  
-✔ Google Sheets-powered contacts  
-✔ Customizable templates  
-✔ Personalization tags  
-✔ Common subject  
-✔ Safety throttling  
-✔ Automatic status tracking
-
----
-
-## Optional Advanced Features
-
-Available upon request:
-
-- Duplicate-prevention (hashing + cache)
-- Retry logic for failed sends
-- Error column in sheet
-- Preview mode (no sending)
-- Logging dashboard
-- Next.js frontend UI
-- Drag-and-drop email builder
-
-Just ask if you want these added!
