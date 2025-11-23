@@ -11,9 +11,6 @@ const SCOPES = [
 const TOKEN_PATH = "token.json";
 const SPREADSHEET_ID = process.env.SpreadSheetID;
 
-// ---------------------------------------------
-//  AUTH
-// ---------------------------------------------
 async function authorize(): Promise<OAuth2Client> {
   const raw = fs.readFileSync("credentials.json", "utf8");
   const credentials = JSON.parse(raw);
@@ -67,9 +64,6 @@ function getNewToken(oAuth2Client: OAuth2Client): Promise<OAuth2Client> {
   });
 }
 
-// ---------------------------------------------
-//  SHEETS FUNCTIONS
-// ---------------------------------------------
 async function getSheetData(auth: OAuth2Client): Promise<string[][]> {
   const sheets = google.sheets({ version: "v4", auth });
   const res = await sheets.spreadsheets.values.get({
@@ -90,7 +84,6 @@ async function getEmailTemplate(auth: OAuth2Client): Promise<string> {
   return values?.[0]?.[0] || "";
 }
 
-// ⭐ NEW — Get common subject from sheet
 async function getCommonSubject(auth: OAuth2Client): Promise<string> {
   const sheets = google.sheets({ version: "v4", auth });
   const res = await sheets.spreadsheets.values.get({
@@ -106,9 +99,6 @@ async function getCommonSubject(auth: OAuth2Client): Promise<string> {
   return values[0][0].replace("CommonSubject:", "").trim();
 }
 
-// ---------------------------------------------
-//  TEMPLATE PROCESSING
-// ---------------------------------------------
 function personalize(template: string, data: string[]): string {
   return template
     .replace(/{{\s*name\s*}}/gi, data[0] || "")
@@ -121,9 +111,6 @@ function stripSubject(template: string): string {
   return template.split("\n").slice(1).join("\n");
 }
 
-// ---------------------------------------------
-//  SEND EMAIL
-// ---------------------------------------------
 async function sendEmail(
   auth: OAuth2Client,
   to: string,
@@ -164,9 +151,6 @@ async function markAsSent(auth: OAuth2Client, rowIndex: number) {
   });
 }
 
-// ---------------------------------------------
-//  MAIN
-// ---------------------------------------------
 async function main(): Promise<void> {
   if (!SPREADSHEET_ID) {
     console.error("SPREADSHEET_ID not found.");
@@ -196,7 +180,7 @@ async function main(): Promise<void> {
       await sendEmail(auth, email, subject, htmlBody);
       await markAsSent(auth, i);
 
-      console.log(`✔ SENT: ${email}`);
+      console.log(`SENT: ${email}`);
       await new Promise((r) => setTimeout(r, 1500)); // Gmail safe delay
     }
   } catch (err) {
